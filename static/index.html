@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTP Login</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f4f6f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .card {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        h2 {
+            margin-bottom: 8px;
+            color: #1e293b;
+        }
+
+        p.subtitle {
+            font-size: 14px;
+            color: #64748b;
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #334155;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: #2563eb;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #1d4ed8;
+        }
+
+        button:disabled {
+            background-color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .message {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .message.error {
+            background-color: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+
+        .message.success {
+            background-color: #f0fdf4;
+            color: #16a34a;
+            border: 1px solid #bbf7d0;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .dashboard {
+            text-align: center;
+        }
+
+        .dashboard h2 {
+            color: #16a34a;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <!-- Step 1: Request OTP -->
+        <div id="step-email">
+            <h2>Sign In</h2>
+            <p class="subtitle">Enter your email to receive a verification code.</p>
+            <form id="form-email" onsubmit="handleSendOTP(event)">
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" required placeholder="you@example.com">
+                </div>
+                <button type="submit" id="btn-send">Send OTP</button>
+            </form>
+        </div>
+
+        <!-- Step 2: Verify OTP -->
+        <div id="step-otp" class="hidden">
+            <h2>Enter Code</h2>
+            <p class="subtitle" id="otp-sent-text">We sent a 6-digit code to your email.</p>
+            <form id="form-otp" onsubmit="handleVerifyOTP(event)">
+                <div class="form-group">
+                    <label for="otp">Verification Code</label>
+                    <input type="text" id="otp" required maxlength="6" placeholder="123456" pattern="\d{6}">
+                </div>
+                <button type="submit" id="btn-verify">Verify & Log In</button>
+            </form>
+        </div>
+
+        <!-- Step 3: Success Screen -->
+        <div id="step-success" class="dashboard hidden">
+            <h2>Successfully Logged In!</h2>
+            <p class="subtitle">Welcome, <strong id="logged-user"></strong></p>
+            <button onclick="location.reload()">Log Out</button>
+        </div>
+
+        <!-- Status / Error Message Container -->
+        <div id="msg-box" class="message"></div>
+    </div>
+
+    <script>
+        let currentEmail = '';
+
+        function showMessage(text, isError = false) {
+            const box = document.getElementById('msg-box');
+            box.innerText = text;
+            box.className = `message ${isError ? 'error' : 'success'}`;
+            box.style.display = 'block';
+        }
+
+        function clearMessage() {
+            const box = document.getElementById('msg-box');
+            box.style.display = 'none';
+        }
+
+        async function handleSendOTP(event) {
+            event.preventDefault();
+            clearMessage();
+
+            const email = document.getElementById('email').value;
+            const btn = document.getElementById('btn-send');
+
+            btn.disabled = true;
+            btn.innerText = 'Sending OTP...';
+
+            try {
+                const response = await fetch('/api/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Failed to send OTP');
+                }
+
+                currentEmail = email;
+                document.getElementById('otp-sent-text').innerText = `We sent a 6-digit code to ${email}`;
+                document.getElementById('step-email').classList.add('hidden');
+                document.getElementById('step-otp').classList.remove('hidden');
+                showMessage('OTP sent successfully! Check your inbox.');
+
+            } catch (err) {
+                showMessage(err.message, true);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Send OTP';
+            }
+        }
+
+        async function handleVerifyOTP(event) {
+            event.preventDefault();
+            clearMessage();
+
+            const otp = document.getElementById('otp').value;
+            const btn = document.getElementById('btn-verify');
+
+            btn.disabled = true;
+            btn.innerText = 'Verifying...';
+
+            try {
+                const response = await fetch('/api/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: currentEmail, otp: otp })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Invalid or expired OTP');
+                }
+
+                document.getElementById('step-otp').classList.add('hidden');
+                document.getElementById('logged-user').innerText = data.email;
+                document.getElementById('step-success').classList.remove('hidden');
+                clearMessage();
+
+            } catch (err) {
+                showMessage(err.message, true);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Verify & Log In';
+            }
+        }
+    </script>
+</body>
+</html>
